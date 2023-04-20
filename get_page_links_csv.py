@@ -6,8 +6,10 @@ import wikipedia
 import requests
 import json
 import sys
+import base64
 
-
+LINKS_CSV_FILE = "./data/links.csv"
+PAGES_CSV_FILE = "./data/pages.csv"
 
 WIKI_REQUEST = 'http://ru.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles='
 
@@ -25,6 +27,11 @@ def get_wiki_image(search_term):
         return 0
     
 
+def get_as_base64(url):
+    if url == 0:
+        return 0 
+    return base64.b64encode(requests.get(url).content)
+
 def get_module_logger(mod_name):
     """
     To use this, do logger = get_module_logger(__name__)
@@ -39,12 +46,25 @@ def get_module_logger(mod_name):
     return logger
 
 
+def load(): 
+    links_df = pd.read_csv(LINKS_CSV_FILE)
+    pages_df = pd.read_csv(PAGES_CSV_FILE)
+    return links_df, pages_df
+
+
+def write(pdf, ldf):
+    pdf.to_csv(PAGES_CSV_FILE)
+    ldf.to_csv(LINKS_CSV_FILE)
+    
 def main():
+    ldf, pdf = load()
+
     wiki_wiki = wikipediaapi.Wikipedia('ru')
     
     page_py = wiki_wiki.page(sys.argv[1])
     
-    rows = []
+    pages = []
+    links = []
 
     for page in tqdm(page_py.links.keys()):
         try:
@@ -55,14 +75,27 @@ def main():
                 'title': page_name,
                 'desc': page_desc,
                 'url': page_url,
-                'img': get_wiki_image(page_name)
+                'img': get_as_base64(get_wiki_image(page_name))
             }
             get_module_logger(__name__).info(f'Added {new_row}')
-            rows.append(new_row)
-            wiki_df = pd.DataFrame.from_dict(rows)
-            wiki_df.to_csv(f'data/{sys.argv[1]}_links.csv')
+
+            pages.append(new_row)
+
+            links.append({'source': page_py.title,'dest': new_row['title']})
+
         except KeyError:
             continue
+    
+    new_ldf = pd.DataFrame.from_dict(links)
+    new_pdf = pd.DataFrame.from_dict(pages)
+
+    frame_links = [ldf, new_ldf]
+    frame_pages = [pdf, new_pdf]
+
+    new_links = pd.concat(frame_links)
+    new_pages = pd.concat(frame_pages)
+    write(new_pages, new_links)
+    # write(new_pdf, new_ldf)
     
     
 
