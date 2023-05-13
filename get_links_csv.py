@@ -2,28 +2,28 @@ import wikipediaapi
 import logging
 import pandas as pd
 from tqdm import tqdm
-import wikipedia
+# import wikipedia
 import requests
 import json
 import sys
 import base64
 
-LINKS_CSV_FILE = "./data/links_only.csv"
+LINKS_CSV_FILE = "./data/links_only_clear.csv"
 
 WIKI_REQUEST = 'http://ru.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles='
 
-def get_wiki_image(search_term):
-    try:
-        result = wikipedia.search(search_term, results = 1)
-        wikipedia.set_lang('ru')
-        wkpage = wikipedia.WikipediaPage(title = result[0])
-        title = wkpage.title
-        response  = requests.get(WIKI_REQUEST+title)
-        json_data = json.loads(response.text)
-        img_link = list(json_data['query']['pages'].values())[0]['original']['source']
-        return img_link        
-    except:
-        return 0
+# def get_wiki_image(search_term):
+#     try:
+#         result = wikipedia.search(search_term, results = 1)
+#         wikipedia.set_lang('ru')
+#         wkpage = wikipedia.WikipediaPage(title = result[0])
+#         title = wkpage.title
+#         response  = requests.get(WIKI_REQUEST+title)
+#         json_data = json.loads(response.text)
+#         img_link = list(json_data['query']['pages'].values())[0]['original']['source']
+#         return img_link        
+#     except:
+#         return 0
     
 
 def get_as_base64(url):
@@ -44,6 +44,12 @@ def get_module_logger(mod_name):
     logger.setLevel(logging.DEBUG)
     return logger
 
+def safe_clear(df): 
+    for col in df:
+        if col not in ['source_name','dest_name','dest_url','source_url']:
+            df = df.drop(col,axis=1)
+            print("dropped ", col)
+    return df
 
 def load(): 
     links_df = pd.read_csv(LINKS_CSV_FILE)
@@ -56,6 +62,7 @@ def write(ldf):
 def main():
     ldf = load()
 
+    ldf = safe_clear(ldf)
     wiki_wiki = wikipediaapi.Wikipedia('ru')
     
     page_py = wiki_wiki.page(sys.argv[1])
@@ -85,6 +92,8 @@ def main():
     frame_data = [ldf, data]
 
     updated_data = pd.concat(frame_data)
+    updated_data = safe_clear(updated_data)
+
     write(updated_data)
     
     
